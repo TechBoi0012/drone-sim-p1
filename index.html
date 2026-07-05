@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="A realistic 3D FPV and chase drone flight simulator built using HTML5, CSS3, JavaScript, and Three.js. Train your quadcopter flight skills in Angle and Acro modes.">
+    <title>Skyward FPV: 3D Drone Flight Simulator</title>
+    <!-- Google Fonts for futuristic sci-fi UI -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <!-- Three.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+    <div id="app-container">
+        <!-- The 3D WebGL Canvas will be injected here -->
+        
+        <!-- Retro Betaflight-style OSD (On-Screen Display) -->
+        <div id="hud-overlay" class="hidden">
+            <!-- Center Crosshair and Pitch Ladder -->
+            <div id="osd-center">
+                <div id="osd-crosshair">+</div>
+                <div id="osd-pitch-ladder">
+                    <div class="ladder-bar" id="ladder-up-10">10</div>
+                    <div class="ladder-bar" id="ladder-0">---</div>
+                    <div class="ladder-bar" id="ladder-down-10">-10</div>
+                </div>
+            </div>
+
+            <!-- Top Left: Flight Info -->
+            <div id="osd-top-left" class="osd-panel">
+                <div id="osd-voltage">BAT: 16.80 V</div>
+                <div id="osd-voltage-cells">(4S: 4.20V/C)</div>
+                <div id="osd-current">AMP: 0.0 A</div>
+            </div>
+
+            <!-- Top Right: Mode & Timer -->
+            <div id="osd-top-right" class="osd-panel">
+                <div id="osd-flight-mode">MODE: ANGLE</div>
+                <div id="osd-timer">00:00.00</div>
+            </div>
+
+            <!-- Bottom Left: Flight Stats -->
+            <div id="osd-bottom-left" class="osd-panel">
+                <div id="osd-rssi">RSSI: 99%</div>
+                <div id="osd-speed">SPD: 0.0 m/s</div>
+                <div id="osd-altitude">ALT: 0.0 m</div>
+            </div>
+
+            <!-- Bottom Right: Gate & Game Info -->
+            <div id="osd-bottom-right" class="osd-panel">
+                <div id="osd-gates">GATES: 0 / 10</div>
+                <div id="osd-throttle">THR: 0%</div>
+            </div>
+
+            <!-- Bottom Center: Alert Messages -->
+            <div id="osd-alert-zone">
+                <div id="osd-alert-msg"></div>
+            </div>
+        </div>
+
+        <!-- High-Tech Menu Overlay -->
+        <div id="menu-overlay" class="menu-screen">
+            <div class="glass-panel">
+                <h1>SKYWARD FPV</h1>
+                <p class="subtitle">3D Quadcopter Flight Simulator</p>
+                
+                <div class="menu-tabs">
+                    <button id="tab-play" class="tab-btn active" onclick="switchTab('play')">FLIGHT DECK</button>
+                    <button id="tab-rates" class="tab-btn" onclick="switchTab('rates')">RATES TUNING</button>
+                    <button id="tab-settings" class="tab-btn" onclick="switchTab('settings')">DRONE CONFIG</button>
+                    <button id="tab-help" class="tab-btn" onclick="switchTab('help')">PILOT MANUAL</button>
+                </div>
+
+                <!-- PLAY TAB -->
+                <div id="panel-play" class="tab-panel active">
+                    <div class="flight-setup">
+                        <h3>Select Track</h3>
+                        <div class="track-selection">
+                            <label class="track-card">
+                                <input type="radio" name="track" value="neon_grid" checked>
+                                <div class="track-card-content">
+                                    <span class="track-name">Neon Grid Circuit</span>
+                                    <span class="track-desc">Classic cyber course with 10 glowing gates. Perfect for speed runs.</span>
+                                </div>
+                            </label>
+                            <label class="track-card">
+                                <input type="radio" name="track" value="cyber_pillars">
+                                <div class="track-card-content">
+                                    <span class="track-name">The Mega-Pillar Arena</span>
+                                    <span class="track-desc">Fly between gigantic neon columns. Challenges your slalom turning skills.</span>
+                                </div>
+                            </label>
+                            <label class="track-card">
+                                <input type="radio" name="track" value="open_world">
+                                <div class="track-card-content">
+                                    <span class="track-name">Open World Countryside</span>
+                                    <span class="track-desc">Fly freely over forests, buildings, and roads under a sunny sky. Freestyle paradise.</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <button id="btn-launch" class="btn-primary glow-btn" onclick="launchSimulator()">LAUNCH SIMULATOR</button>
+                </div>
+
+                <!-- RATES TUNING TAB -->
+                <div id="panel-rates" class="tab-panel">
+                    <div class="rates-tuning-container">
+                        <div class="rates-sliders">
+                            <h3>Betaflight Rates Configuration</h3>
+                            
+                            <!-- Roll Rates -->
+                            <div class="rate-group">
+                                <h4>Roll (Left/Right Tilt)</h4>
+                                <div class="slider-row">
+                                    <label for="rate-roll-rc">RC Rate</label>
+                                    <input type="range" id="rate-roll-rc" min="0.1" max="2.0" step="0.05" value="1.0" oninput="updateRatesPlot()">
+                                    <span id="val-roll-rc">1.00</span>
+                                </div>
+                                <div class="slider-row">
+                                    <label for="rate-roll-super">Super Rate</label>
+                                    <input type="range" id="rate-roll-super" min="0.0" max="0.9" step="0.02" value="0.70" oninput="updateRatesPlot()">
+                                    <span id="val-roll-super">0.70</span>
+                                </div>
+                                <div class="slider-row">
+                                    <label for="rate-roll-expo">Expo</label>
+                                    <input type="range" id="rate-roll-expo" min="0.0" max="0.9" step="0.02" value="0.15" oninput="updateRatesPlot()">
+                                    <span id="val-roll-expo">0.15</span>
+                                </div>
+                                <div class="max-rate-indicator">Max Rate: <span id="max-rate-roll">667</span> deg/s</div>
+                            </div>
+
+                            <!-- Pitch Rates -->
+                            <div class="rate-group">
+                                <h4>Pitch (Forward/Backward Tilt)</h4>
+                                <div class="slider-row">
+                                    <label for="rate-pitch-rc">RC Rate</label>
+                                    <input type="range" id="rate-pitch-rc" min="0.1" max="2.0" step="0.05" value="1.0" oninput="updateRatesPlot()">
+                                    <span id="val-pitch-rc">1.00</span>
+                                </div>
+                                <div class="slider-row">
+                                    <label for="rate-pitch-super">Super Rate</label>
+                                    <input type="range" id="rate-pitch-super" min="0.0" max="0.9" step="0.02" value="0.70" oninput="updateRatesPlot()">
+                                    <span id="val-pitch-super">0.70</span>
+                                </div>
+                                <div class="slider-row">
+                                    <label for="rate-pitch-expo">Expo</label>
+                                    <input type="range" id="rate-pitch-expo" min="0.0" max="0.9" step="0.02" value="0.15" oninput="updateRatesPlot()">
+                                    <span id="val-pitch-expo">0.15</span>
+                                </div>
+                                <div class="max-rate-indicator">Max Rate: <span id="max-rate-pitch">667</span> deg/s</div>
+                            </div>
+
+                            <!-- Yaw Rates -->
+                            <div class="rate-group">
+                                <h4>Yaw (Horizontal Spin)</h4>
+                                <div class="slider-row">
+                                    <label for="rate-yaw-rc">RC Rate</label>
+                                    <input type="range" id="rate-yaw-rc" min="0.1" max="2.0" step="0.05" value="1.0" oninput="updateRatesPlot()">
+                                    <span id="val-yaw-rc">1.00</span>
+                                </div>
+                                <div class="slider-row">
+                                    <label for="rate-yaw-super">Super Rate</label>
+                                    <input type="range" id="rate-yaw-super" min="0.0" max="0.9" step="0.02" value="0.60" oninput="updateRatesPlot()">
+                                    <span id="val-yaw-super">0.60</span>
+                                </div>
+                                <div class="slider-row">
+                                    <label for="rate-yaw-expo">Expo</label>
+                                    <input type="range" id="rate-yaw-expo" min="0.0" max="0.9" step="0.02" value="0.15" oninput="updateRatesPlot()">
+                                    <span id="val-yaw-expo">0.15</span>
+                                </div>
+                                <div class="max-rate-indicator">Max Rate: <span id="max-rate-yaw">500</span> deg/s</div>
+                            </div>
+                        </div>
+
+                        <div class="rates-plot-area">
+                            <h4>Sensitivity Curve Visualizer</h4>
+                            <canvas id="rates-plot-canvas" width="220" height="220"></canvas>
+                            <p class="helper-text">X-axis: Stick deflection. Y-axis: Degrees/sec rotation speed.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DRONE CONFIG TAB -->
+                <div id="panel-settings" class="tab-panel">
+                    <h3>Physics & Hardware Adjustments</h3>
+                    <div class="settings-grid">
+                        <div class="setting-item">
+                            <label for="setting-weight">Drone Weight (grams)</label>
+                            <select id="setting-weight">
+                                <option value="250">Ultralight (250g) - High maneuverability</option>
+                                <option value="600" selected>Standard FPV (600g) - Realistic momentum</option>
+                                <option value="1200">Heavy Carrier (1.2kg) - Inertia heavy</option>
+                            </select>
+                        </div>
+                        
+                        <div class="setting-item">
+                            <label for="setting-power">Motor Thrust-to-Weight Ratio</label>
+                            <select id="setting-power">
+                                <option value="4">Casual Fly (4:1 ratio)</option>
+                                <option value="8" selected>Racer Spec (8:1 ratio)</option>
+                                <option value="12">Insane Power (12:1 ratio)</option>
+                            </select>
+                        </div>
+
+                        <div class="setting-item">
+                            <label for="setting-battery">Battery Capacity & voltage</label>
+                            <select id="setting-battery">
+                                <option value="3">3S Lipo (11.1V) - Slow cruiser</option>
+                                <option value="4" selected>4S Lipo (14.8V) - Standard performance</option>
+                                <option value="6">6S Lipo (22.2V) - High speed rocket</option>
+                            </select>
+                        </div>
+
+                        <div class="setting-item">
+                            <label for="setting-angle-limit">Angle Mode Limit (degrees)</label>
+                            <input type="range" id="setting-angle-limit" min="15" max="75" value="45">
+                            <span id="val-angle-limit">45°</span>
+                        </div>
+                        
+                        <div class="setting-item">
+                            <label for="setting-wind">Wind Speed (m/s)</label>
+                            <input type="range" id="setting-wind" min="0" max="15" value="0">
+                            <span id="val-wind">0 m/s</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- HELP / PILOT MANUAL TAB -->
+                <div id="panel-help" class="tab-panel">
+                    <h3>Quadcopter Flight School</h3>
+                    <div class="help-content">
+                        <div class="help-section">
+                            <h4>Controls Layout (FPS Style)</h4>
+                            <div class="controls-visualizer">
+                                <div class="stick-card">
+                                    <h5>Throttle & Yaw (Left Hand)</h5>
+                                    <ul>
+                                        <li><strong>Space / Control</strong>: Throttle (Climb / Descend)</li>
+                                        <li><strong>Q / E</strong>: Yaw (Heading Rotation)</li>
+                                    </ul>
+                                </div>
+                                <div class="stick-card">
+                                    <h5>Pitch & Roll (Right Hand)</h5>
+                                    <ul>
+                                        <li><strong>W / S</strong>: Pitch (Tilt Forward / Back)</li>
+                                        <li><strong>A / D</strong>: Roll (Tilt Left / Right)</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="help-section">
+                            <h4>Hotkeys</h4>
+                            <ul>
+                                <li><strong>[C]</strong>: Toggle Camera View (FPV / Chase Camera)</li>
+                                <li><strong>[M]</strong>: Toggle Flight Mode (ANGLE = Stabilized / ACRO = Pro Rate)</li>
+                                <li><strong>[R]</strong>: Reset Drone position (restarts timer)</li>
+                                <li><strong>[ESC]</strong>: Pause / Toggle Menu</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="help-section">
+                            <h4>Acro vs Angle Mode</h4>
+                            <p><strong>Angle Mode</strong> is auto-leveling. The drone will automatically tilt to the angle dictated by the pitch/roll keys, and return to flat hover when released. Perfect to get your bearings.</p>
+                            <p><strong>Acro Mode</strong> is manual rate control. Pressing a pitch or roll key causes the drone to spin constantly in that direction. When you release the key, the drone stays at that angle! To level out, you must apply the counter tilt. This matches real acrobatic FPV racing.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pause Overlay -->
+        <div id="pause-overlay" class="menu-screen hidden">
+            <div class="glass-panel text-center">
+                <h2>SIMULATOR PAUSED</h2>
+                <div class="menu-buttons">
+                    <button class="btn-primary glow-btn" onclick="resumeSimulator()">RESUME FLIGHT</button>
+                    <button class="btn-secondary" onclick="resetFlight()">RESET FLIGHT</button>
+                    <button class="btn-secondary" onclick="exitToMenu()">FLIGHT DECK MENU</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Crash / Completion Overlay -->
+        <div id="end-overlay" class="menu-screen hidden">
+            <div class="glass-panel text-center">
+                <h2 id="end-title">CRASH DETECTED</h2>
+                <p id="end-sub" class="subtitle">Hull Integrity Critical</p>
+                <div id="stats-summary" class="hidden">
+                    <p>Time Elapsed: <span id="summary-time">00:00.00</span></p>
+                    <p>Gates Cleared: <span id="summary-gates">0/10</span></p>
+                    <p>Max Speed Reached: <span id="summary-speed">0.0 m/s</span></p>
+                </div>
+                <div class="menu-buttons">
+                    <button class="btn-primary glow-btn" onclick="resetFlight()">FLY AGAIN [R]</button>
+                    <button class="btn-secondary" onclick="exitToMenu()">FLIGHT DECK MENU</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script imports -->
+    <script src="audio.js"></script>
+    <script src="rates.js"></script>
+    <script src="physics.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>
